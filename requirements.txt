@@ -1,0 +1,7 @@
+openai
+flask~=3.0.3
+watchdog~=4.0.1
+requests~=2.32.3
+pip~=23.3
+distro~=1.9.0
+Jinja2~=3.1.4
