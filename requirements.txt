@@ -1,4 +1,4 @@
-openai
+openai~=1.30.5
 flask~=3.0.3
 watchdog~=4.0.1
 requests~=2.32.3
@@ -7,6 +7,16 @@ distro~=1.9.0
 Jinja2~=3.1.4
 pytest==6.2.4
 requests
-python-dotenv
+python-dotenv~=1.0.1
 prometheus-flask-exporter
 flask-socketio
+
+cachetools~=5.3.3
+attrs~=23.2.0
+typing_extensions~=4.12.0
+MarkupSafe~=2.1.5
+Werkzeug~=3.0.3
+click~=8.1.7
+blinker~=1.8.2
+itsdangerous~=2.2.0
+structlog
