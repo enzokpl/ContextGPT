@@ -5,3 +5,8 @@ requests~=2.32.3
 pip~=23.3
 distro~=1.9.0
 Jinja2~=3.1.4
+pytest==6.2.4
+requests
+python-dotenv
+prometheus-flask-exporter
+flask-socketio

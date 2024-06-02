@@ -4,6 +4,9 @@ import threading
 
 
 def run_monitoring():
+    """
+    Inicia o monitoramento do diretório especificado.
+    """
     start_monitoring('C:/projetos/SojaML')
 
 

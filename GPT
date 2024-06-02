@@ -1,0 +1,13 @@
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system",
+                 "content": "Você é um assistente que ajuda com explicações, implementações e erros de código "
+                            "relacionados ao projeto que está observando."
+                            "Você deve observar o contexto inteiro do projeto e providenciar respostas de acordo."
+                            "Ao implementar código, deve realizar um passo-a-passo de como fazê-lo, apresentar "
+                            "diretórios que deverão ser criados e fazer uma breve explicação de como testar se a "
+                            "funcionalidade está operante."},
+                {"role": "user", "content": prompt}
+            ],
