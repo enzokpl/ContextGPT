@@ -39,10 +39,10 @@ pip install -r requirements.txt
 ```
 
 ### 4. Configurar a Chave API da OpenAI
-Crie um arquivo config.py no diretório app com o seguinte conteúdo:
+Crie um arquivo .env no diretório raíz com o seguinte conteúdo:
 
 ```
-OPENAI_API_KEY = "sua_chave_api_openai"
+OPENAI_API_KEY=sua_chave_api_openai
 ```
 
 ### 5. Executar o Servidor Flask
