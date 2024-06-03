@@ -1,12 +1,14 @@
-import time
-import requests
+# monitor.py
 import os
+import time
 import hashlib
 import json
 import logging
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
-from threading import Timer
+from threading import Timer  # Correção da importação
+import requests
+from .embeddings import get_embedding
 
 API_URL = "http://127.0.0.1:5000/context"
 CACHE_DIR = "cache"
@@ -115,15 +117,16 @@ class ProjectFileHandler(FileSystemEventHandler):
     def process_file(self, file_path):
         try:
             current_hash = calculate_file_hash(file_path)
-            if file_path in self.cache and self.cache[file_path] == current_hash:
+            if file_path in self.cache and self.cache[file_path]['hash'] == current_hash:
                 logging.info(f"File {file_path} has not changed, skipping processing.")
                 return
 
             content = self.read_file(file_path)
             if content is not None:
-                self.cache[file_path] = current_hash
+                embedding = get_embedding(content)
+                self.cache[file_path] = {'hash': current_hash, 'embedding': embedding, 'content': content}
                 save_cache(self.cache)
-                data = {'file_path': file_path, 'content': content}
+                data = {'file_path': file_path, 'embedding': embedding, 'content': content}
                 response = requests.post(API_URL, json=data)
                 if response.status_code == 200:
                     logging.info(f"Updated context for {file_path}")

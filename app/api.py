@@ -1,6 +1,8 @@
 from flask import Flask, request, jsonify
 import openai
 from openai import OpenAI
+
+from app.embeddings import get_embedding, find_most_relevant_embeddings
 from .config import OPENAI_API_KEY
 from flask_swagger_ui import get_swaggerui_blueprint
 from flask import send_from_directory
@@ -34,25 +36,28 @@ def static_files(filename):
     return send_from_directory('static', filename)
 
 
-# Dicionário para armazenar o contexto dos arquivos
-context = {}
+# Dicionário para armazenar os embeddings dos arquivos
+embeddings_context = {}
+contents_context = {}
 
 
 @app.route('/context', methods=['POST'])
 def update_context():
     """
-    Atualiza o contexto dos arquivos.
-    Verifica se a entrada é JSON válida e atualiza o dicionário de contexto com o conteúdo do arquivo fornecido.
+    Atualiza o contexto dos arquivos. Verifica se a entrada é JSON válida e atualiza o dicionário de contexto com o
+    embedding e o conteúdo do arquivo fornecido.
     """
     if not request.is_json:
         return jsonify({"status": "error", "message": "Invalid input, JSON expected."}), 400
 
     data = request.get_json(force=True)
     file_path = data.get('file_path')
+    embedding = data.get('embedding')
     content = data.get('content')
 
-    if file_path and content is not None:
-        context[file_path] = content
+    if file_path and embedding is not None and content is not None:
+        embeddings_context[file_path] = embedding
+        contents_context[file_path] = content
         return jsonify({"status": "success", "message": "Context updated."}), 200
     else:
         return jsonify({"status": "error", "message": "Invalid data."}), 400
@@ -64,8 +69,8 @@ def get_context(file_path):
     Recupera o contexto de um arquivo específico.
     Retorna o conteúdo do arquivo armazenado no dicionário de contexto.
     """
-    if file_path in context:
-        return jsonify({"status": "success", "content": context[file_path]}), 200
+    if file_path in embeddings_context:
+        return jsonify({"status": "success", "content": embeddings_context[file_path]}), 200
     else:
         return jsonify({"status": "error", "message": "File not found."}), 404
 
@@ -75,8 +80,8 @@ def delete_context(file_path):
     """
     Remove o contexto de um arquivo específico.
     """
-    if file_path in context:
-        del context[file_path]
+    if file_path in embeddings_context:
+        del embeddings_context[file_path]
         return jsonify({"status": "success", "message": "Context removed."}), 200
     else:
         return jsonify({"status": "error", "message": "File not found."}), 404
@@ -90,7 +95,7 @@ def health_check():
     try:
         # Verifique se a API OpenAI está acessível
         response = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4o",
             messages=[
                 {"role": "system", "content": "Health check."},
                 {"role": "user", "content": "Are you healthy?"}
@@ -105,8 +110,8 @@ def health_check():
 @app.route('/generate-response', methods=['POST'])
 def generate_response():
     """
-    Gera uma resposta usando o modelo GPT-4 da OpenAI.
-    Adiciona o contexto dos arquivos ao prompt fornecido pelo usuário e envia uma requisição para a API da OpenAI.
+    Gera uma resposta usando o modelo GPT-4o da OpenAI. Adiciona o contexto relevante dos arquivos ao prompt
+    fornecido pelo usuário e envia uma requisição para a API da OpenAI.
     """
     if not request.is_json:
         return jsonify({"status": "error", "message": "Invalid input, JSON expected."}), 400
@@ -117,9 +122,12 @@ def generate_response():
     if not prompt:
         return jsonify({"status": "error", "message": "Prompt is required."}), 400
 
-    # Adicionar contexto dos arquivos ao prompt
-    for file_path, content in context.items():
-        prompt += f"\n\nConteúdo do arquivo {file_path}:\n{content}"
+    query_embedding = get_embedding(prompt)
+    relevant_files = find_most_relevant_embeddings(query_embedding, embeddings_context)
+
+    # Adicionar contexto relevante dos arquivos ao prompt
+    for file_path, _ in relevant_files:
+        prompt += f"\n\nConteúdo do arquivo {file_path}:\n{contents_context[file_path]}"
 
     try:
         response = client.chat.completions.create(
@@ -140,7 +148,6 @@ def generate_response():
         return jsonify({"status": "error", "message": str(e)}), 500
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
-
 
 
 if __name__ == '__main__':

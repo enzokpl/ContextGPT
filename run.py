@@ -1,4 +1,5 @@
 from app.api import app
+from app.config import project_dir
 from app.monitor import start_monitoring
 import threading
 
@@ -7,7 +8,7 @@ def run_monitoring():
     """
     Inicia o monitoramento do diretório especificado.
     """
-    start_monitoring('C:/projetos/SojaML')
+    start_monitoring(project_dir)
 
 
 if __name__ == '__main__':
