@@ -1,13 +1,15 @@
 # monitor.py
-import os
-import time
 import hashlib
 import json
 import logging
-from watchdog.observers import Observer
+import os
+import time
+from threading import Timer
+
 from watchdog.events import FileSystemEventHandler
-from threading import Timer  # Correção da importação
-import requests
+from watchdog.observers import Observer
+
+from .db import MongoDBConnector
 from .embeddings import get_embedding
 
 API_URL = "http://127.0.0.1:5000/context"
@@ -127,24 +129,31 @@ class ProjectFileHandler(FileSystemEventHandler):
                 self.cache[file_path] = {'hash': current_hash, 'embedding': embedding, 'content': content}
                 save_cache(self.cache)
                 data = {'file_path': file_path, 'embedding': embedding, 'content': content}
-                response = requests.post(API_URL, json=data)
-                if response.status_code == 200:
-                    logging.info(f"Updated context for {file_path}")
-                else:
-                    logging.error(f"Failed to update context for {file_path}: {response.status_code}")
+
+                with MongoDBConnector() as connector:
+                    result = connector.insert_or_update_document(data)
+
+                if result.matched_count > 0:  # Verifica se algum documento foi encontrado
+                    if result.modified_count > 0:  # Verifica se houve modificação
+                        logging.info(f"Updated context for {file_path}")
+                        print(f"Arquivo {file_path} atualizado no base de dados com sucesso!")
+                    else:
+                        logging.info(f"Arquivo {file_path} já existe na base de dados, nenhuma alteração realizada.")
+                elif result.upserted_id is not None:  # Verifica se um novo documento foi inserido
+                    logging.info(f"Saved context for {file_path}")
+                    print(f"Arquivo {file_path} adicionado na base de dados com sucesso!")
+
         except Exception as e:
             logging.error(f"Error processing file {file_path}: {e}")
 
     def handle_deleted_file(self, file_path):
         try:
-            response = requests.delete(f"{API_URL}/{file_path}")
-            if response.status_code == 200:
-                logging.info(f"Removed context for {file_path}")
-                if file_path in self.cache:
-                    del self.cache[file_path]
-                    save_cache(self.cache)
-            else:
-                logging.error(f"Failed to remove context for {file_path}: {response.status_code}")
+            with MongoDBConnector() as connector:
+                connector.delete_document(file_path)
+            logging.info(f"Removed context for {file_path}")
+            if file_path in self.cache:
+                del self.cache[file_path]
+                save_cache(self.cache)
         except Exception as e:
             logging.error(f"Error removing context for file {file_path}: {e}")
 

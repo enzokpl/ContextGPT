@@ -1,6 +1,6 @@
-# embeddings.py
 import numpy as np
 from .config import client
+from .db import MongoDBConnector
 
 
 def get_embedding(text):
@@ -20,7 +20,6 @@ def cosine_similarity(vec1, vec2):
     return dot_product / (norm_vec1 * norm_vec2)
 
 
-def find_most_relevant_embeddings(query_embedding, embeddings, top_n=5):
-    similarities = [(file_path, cosine_similarity(query_embedding, emb)) for file_path, emb in embeddings.items()]
-    similarities.sort(key=lambda x: x[1], reverse=True)
-    return similarities[:top_n]
+def find_most_relevant_embeddings(query_embedding, top_n=5):
+    with MongoDBConnector() as connector:
+        return connector.find_relevant_embeddings(query_embedding, top_n)
