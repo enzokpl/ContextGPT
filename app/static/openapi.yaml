@@ -1,71 +1,24 @@
-openapi: 3.0.0
+openapi: 3.0.1
 info:
   title: ContextGPT API
-  description: API para gerenciar contexto de arquivos e gerar respostas usando GPT-4.
+  description: API para gerenciar contexto de arquivos e gerar respostas com contexto.
   version: 1.0.0
 servers:
-  - url: http://127.0.0.1:5000
-    description: Servidor local
-
+  - url: http://127.0.0.1:5000/  # Ajuste para o seu endereço e porta
 paths:
-  /context:
-    post:
-      summary: Atualiza o contexto dos arquivos
-      description: Verifica se a entrada é JSON válida e atualiza o dicionário de contexto com o conteúdo do arquivo fornecido.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                file_path:
-                  type: string
-                  example: "caminho/do/arquivo.py"
-                content:
-                  type: string
-                  example: "Conteúdo do arquivo."
-      responses:
-        '200':
-          description: Context updated
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: "success"
-                  message:
-                    type: string
-                    example: "Context updated."
-        '400':
-          description: Invalid input, JSON expected
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: "error"
-                  message:
-                    type: string
-                    example: "Invalid input, JSON expected."
-
   /context/{file_path}:
     get:
-      summary: Recupera o contexto de um arquivo específico
+      summary: Recupera o embedding de um arquivo.
       parameters:
         - name: file_path
           in: path
+          description: Caminho do arquivo.
           required: true
           schema:
             type: string
-            example: "caminho/do/arquivo.py"
       responses:
         '200':
-          description: Success
+          description: Embedding do arquivo encontrado.
           content:
             application/json:
               schema:
@@ -75,62 +28,28 @@ paths:
                     type: string
                     example: "success"
                   content:
-                    type: string
-                    example: "Conteúdo do arquivo."
+                    type: array
+                    items:
+                      type: number
         '404':
-          description: File not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: "error"
-                  message:
-                    type: string
-                    example: "File not found."
-
+          description: Arquivo não encontrado.
     delete:
-      summary: Remove o contexto de um arquivo específico
+      summary: Remove o contexto de um arquivo específico.
       parameters:
         - name: file_path
           in: path
+          description: Caminho do arquivo.
           required: true
           schema:
             type: string
-            example: "caminho/do/arquivo.py"
       responses:
         '200':
-          description: Success
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: "success"
-                  message:
-                    type: string
-                    example: "Context removed."
+          description: Contexto removido com sucesso.
         '404':
-          description: File not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: "error"
-                  message:
-                    type: string
-                    example: "File not found."
-
+          description: Arquivo não encontrado.
   /generate-response:
     post:
-      summary: Gera uma resposta usando o modelo GPT-4
+      summary: Gera uma resposta com base no contexto dos arquivos.
       requestBody:
         required: true
         content:
@@ -140,10 +59,10 @@ paths:
               properties:
                 prompt:
                   type: string
-                  example: "Explique o que faz este trecho de código."
+                  description: O prompt de entrada para gerar a resposta.
       responses:
         '200':
-          description: Success
+          description: Resposta gerada com sucesso.
           content:
             application/json:
               schema:
@@ -154,68 +73,16 @@ paths:
                     example: "success"
                   response:
                     type: string
-                    example: "Este trecho de código faz XYZ."
+                    description: A resposta gerada pelo modelo.
         '400':
-          description: Prompt is required
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: "error"
-                  message:
-                    type: string
-                    example: "Prompt is required."
+          description: Requisição inválida.
         '500':
-          description: Error
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: "error"
-                  message:
-                    type: string
-                    example: "Internal server error."
-
+          description: Erro interno do servidor.
   /health:
     get:
-      summary: Verifica o status de saúde da aplicação
+      summary: Verifica a saúde da aplicação.
       responses:
         '200':
-          description: Application is healthy
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: "success"
-                  message:
-                    type: string
-                    example: "Application is healthy."
+          description: Aplicação saudável.
         '500':
-          description: Application is unhealthy
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: "error"
-                  message:
-                    type: string
-                    example: "Application is unhealthy."
-
-  /metrics:
-    get:
-      summary: Exibe as métricas de performance da aplicação
-      responses:
-        '200':
-          description: Métricas geradas pelo Prometheus
+          description: Aplicação com problemas.

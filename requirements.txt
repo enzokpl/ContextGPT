@@ -26,4 +26,9 @@ asyncio~=3.4.3
 filelock~=3.14.0
 timer~=0.3.0
 diskcache~=5.6.3
-pymongo
+pymongo~=4.7.2
+redis~=5.0.4
+coloredlogs~=15.0.1
+streamlit~=1.35.0
+pillow~=10.3.0
+tornado~=6.4

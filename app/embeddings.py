@@ -1,3 +1,4 @@
+# embeddings.py
 import numpy as np
 from .config import client
 from .db import MongoDBConnector

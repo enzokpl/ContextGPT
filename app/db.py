@@ -1,5 +1,11 @@
+# db.py
+import logging
+import coloredlogs
+
 from pymongo import MongoClient
 from .config import MONGODB_URI, DATABASE_NAME, COLLECTION_NAME
+
+coloredlogs.install()
 
 
 class MongoDBConnector:
@@ -15,7 +21,18 @@ class MongoDBConnector:
         self.client.close()
 
     def insert_or_update_document(self, data):
-        self.collection.update_one({'file_path': data['file_path']}, {'$set': data}, upsert=True)
+        try:
+            result = self.collection.update_one({'file_path': data['file_path']}, {'$set': data}, upsert=True)
+            if result.acknowledged:
+                logging.info(
+                    f"MongoDB Result: acknowledged=True, matched_count={result.matched_count},"
+                    f" modified_count={result.modified_count}, upserted_id={result.upserted_id}")
+            else:
+                logging.warning(f"MongoDB Update Result: acknowledged=False")
+            return result
+        except Exception as e:
+            logging.error(f"Erro ao inserir/atualizar documento no MongoDB: {e}")
+            return None
 
     def get_document(self, file_path):
         return self.collection.find_one({'file_path': file_path})
@@ -51,3 +68,6 @@ class MongoDBConnector:
         ]
         results = list(self.collection.aggregate(pipeline))
         return [(doc['file_path'], doc['similarity']) for doc in results]
+
+    # Configuração do logging para filtrar mensagens de "Waiting for suitable server..."
+    logging.getLogger("pymongo").setLevel(logging.DEBUG)  # Ou logging.ERROR, se quiser apenas erros

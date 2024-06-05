@@ -1,7 +1,8 @@
+# run.py
 from app.api import app
 from app.config import project_dir
 from app.monitor import start_monitoring
-import threading
+import multiprocessing
 
 
 def run_monitoring():
@@ -12,9 +13,7 @@ def run_monitoring():
 
 
 if __name__ == '__main__':
-    # Iniciar monitoramento em uma thread separada
-    monitor_thread = threading.Thread(target=run_monitoring)
-    monitor_thread.start()
-
     # Iniciar a API Flask
     app.run(debug=True)
+
+# todo - fazer com que as bases de dados iniciem automaticamente no "run", junto com o app.

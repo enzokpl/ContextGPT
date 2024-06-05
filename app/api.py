@@ -1,3 +1,6 @@
+# api.py
+import logging
+
 import openai
 from flask import Flask, request, jsonify
 from flask import send_from_directory
@@ -99,27 +102,29 @@ def generate_response():
     query_embedding = get_embedding(prompt)
     relevant_files = find_most_relevant_embeddings(query_embedding)
 
-    context = prompt  # Inicializa o contexto com o prompt do usuário
+    context_messages = [{"role": "system",
+                         "content": "Você é um assistente que ajuda com explicações, implementações e erros de "
+                                    "código relacionados ao projeto que está observando."
+                                    "Você deve observar o contexto inteiro do projeto e providenciar respostas de "
+                                    "acordo. Ao implementar código, deve realizar um passo-a-passo de como fazê-lo,"
+                                    " apresentar diretórios que deverão ser criados e fazer uma breve explicação "
+                                    "de como testar se a funcionalidade está operante."}]
     with MongoDBConnector() as connector:
-        for file_path, _ in relevant_files:
+        for file_path, similarity in relevant_files:
             document = connector.get_document(file_path)
             if document:
-                context += f"\n\nConteúdo do arquivo {file_path}:\n{document['content']}"
+                context_content = f"### File: {file_path} (Similarity: {similarity:.2f})\n\n{document['content']}"
+                context_messages.append({"role": "system", "content": context_content})
 
+    context_messages.append({"role": "user", "content": prompt})
+
+    logging.info(f"Contexto enviado para o ChatGPT: {context_messages}")
     try:
         response = client.chat.completions.create(
             model="gpt-4o",
-            messages=[
-                {"role": "system",
-                 "content": "Você é um assistente que ajuda com explicações, implementações e erros de "
-                            "código relacionados ao projeto que está observando."
-                            "Você deve observar o contexto inteiro do projeto e providenciar respostas de "
-                            "acordo. Ao implementar código, deve realizar um passo-a-passo de como fazê-lo,"
-                            " apresentar diretórios que deverão ser criados e fazer uma breve explicação "
-                            "de como testar se a funcionalidade está operante."},
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=500)
+            messages=context_messages,
+            max_tokens=500
+        )
         return jsonify({"status": "success", "response": response.choices[0].message.content}), 200
     except openai.OpenAIError as e:
         return jsonify({"status": "error", "message": str(e)}), 500

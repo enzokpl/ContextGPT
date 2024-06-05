@@ -1,26 +1,25 @@
 # monitor.py
 import hashlib
-import json
 import logging
 import os
 import time
-from threading import Timer
 
+import coloredlogs
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
+from .cache import RedisCache
 from .db import MongoDBConnector
 from .embeddings import get_embedding
 
 API_URL = "http://127.0.0.1:5000/context"
-CACHE_DIR = "cache"
-CACHE_FILE = os.path.join(CACHE_DIR, "file_cache.json")
-BACKUP_FILE = os.path.join(CACHE_DIR, "file_cache_backup.json")
 BACKUP_INTERVAL = 3600  # Intervalo de backup em segundos (1 hora)
 
 # Configuração do logging
 if not os.path.exists("logs"):
     os.makedirs("logs")
+
+coloredlogs.install()
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', handlers=[
     logging.FileHandler("logs/file_monitor.log"),
@@ -39,43 +38,6 @@ def calculate_file_hash(file_path):
     return sha256.hexdigest()
 
 
-def load_cache():
-    """
-    Carrega o cache de um arquivo JSON.
-    """
-    if not os.path.exists(CACHE_DIR):
-        os.makedirs(CACHE_DIR)
-    if os.path.exists(CACHE_FILE):
-        with open(CACHE_FILE, 'r') as f:
-            return json.load(f)
-    return {}
-
-
-def save_cache(cache):
-    """
-    Salva o cache em um arquivo JSON.
-    """
-    if not os.path.exists(CACHE_DIR):
-        os.makedirs(CACHE_DIR)
-    with open(CACHE_FILE, 'w') as f:
-        json.dump(cache, f)
-
-
-def backup_cache():
-    """
-    Faz backup do cache em um arquivo JSON.
-    """
-    if os.path.exists(CACHE_FILE):
-        with open(CACHE_FILE, 'r') as f:
-            cache_data = f.read()
-        with open(BACKUP_FILE, 'w') as f:
-            f.write(cache_data)
-        logging.info("Cache backup realizado com sucesso.")
-
-    # Reagenda o próximo backup
-    Timer(BACKUP_INTERVAL, backup_cache).start()
-
-
 class ProjectFileHandler(FileSystemEventHandler):
     """
     Manipulador de eventos para arquivos de projeto.
@@ -84,7 +46,6 @@ class ProjectFileHandler(FileSystemEventHandler):
 
     def __init__(self):
         super().__init__()
-        self.cache = load_cache()
 
     def on_modified(self, event):
         if not event.is_directory:
@@ -119,15 +80,15 @@ class ProjectFileHandler(FileSystemEventHandler):
     def process_file(self, file_path):
         try:
             current_hash = calculate_file_hash(file_path)
-            if file_path in self.cache and self.cache[file_path]['hash'] == current_hash:
-                logging.info(f"File {file_path} has not changed, skipping processing.")
-                return
+            with RedisCache() as cache:
+                cached_hash = cache.get(file_path)
+                if cached_hash == current_hash:
+                    logging.info(f"File {file_path} has not changed, skipping processing.")
+                    return
 
             content = self.read_file(file_path)
             if content is not None:
                 embedding = get_embedding(content)
-                self.cache[file_path] = {'hash': current_hash, 'embedding': embedding, 'content': content}
-                save_cache(self.cache)
                 data = {'file_path': file_path, 'embedding': embedding, 'content': content}
 
                 with MongoDBConnector() as connector:
@@ -135,12 +96,11 @@ class ProjectFileHandler(FileSystemEventHandler):
 
                 if result.matched_count > 0:  # Verifica se algum documento foi encontrado
                     if result.modified_count > 0:  # Verifica se houve modificação
-                        logging.info(f"Updated context for {file_path}")
-                        print(f"Arquivo {file_path} atualizado no base de dados com sucesso!")
+                        logging.info(f"Contexto atualizado para {file_path}")
                     else:
                         logging.info(f"Arquivo {file_path} já existe na base de dados, nenhuma alteração realizada.")
                 elif result.upserted_id is not None:  # Verifica se um novo documento foi inserido
-                    logging.info(f"Saved context for {file_path}")
+                    logging.info(f"Contexto salvo para {file_path}")
                     print(f"Arquivo {file_path} adicionado na base de dados com sucesso!")
 
         except Exception as e:
@@ -151,9 +111,9 @@ class ProjectFileHandler(FileSystemEventHandler):
             with MongoDBConnector() as connector:
                 connector.delete_document(file_path)
             logging.info(f"Removed context for {file_path}")
-            if file_path in self.cache:
-                del self.cache[file_path]
-                save_cache(self.cache)
+
+            with RedisCache() as cache:
+                cache.delete(file_path)
         except Exception as e:
             logging.error(f"Error removing context for file {file_path}: {e}")
 
@@ -170,7 +130,7 @@ class ProjectFileHandler(FileSystemEventHandler):
 
     def should_ignore(self, file_path):
         ignore_extensions = ['.lock', '.tmp', '.log']
-        ignore_dirs = ['.git', '__pycache__', '.idea', 'venv', 'data']
+        ignore_dirs = ['.git', '__pycache__', '.idea', 'venv', 'data', '.venv']
         if any(file_path.endswith(ext) for ext in ignore_extensions):
             return True
         if any(dir in file_path for dir in ignore_dirs):
@@ -212,9 +172,6 @@ def start_monitoring(path):
     event_handler = ProjectFileHandler()
     # Processar todos os arquivos existentes no diretório monitorado
     process_existing_files(path, event_handler)
-
-    # Inicia o backup periódico do cache
-    backup_cache()
 
     observer = Observer()
     observer.schedule(event_handler, path, recursive=True)
