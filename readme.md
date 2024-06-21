@@ -1,3 +1,5 @@
+(PROJETO NÃO FINALIZADO)
+
 # ContextGPT
 
 ContextGPT é uma API Flask que utiliza o OpenAI GPT-4 para fornecer respostas contextuais baseadas no conteúdo dos arquivos monitorados em um diretório específico. A API é capaz de atualizar seu contexto em tempo real conforme os arquivos são modificados, criados ou excluídos.
